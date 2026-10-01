@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useAuth } from '@/components/Providers';
 import {
   Award,
   ShieldCheck,
@@ -24,7 +25,7 @@ interface CertificateTier {
   type: string;
   badge: string;
   description: string;
-  recipient: string;
+  recipient?: string;
   program: string;
   duration: string;
   dates: string;
@@ -41,7 +42,6 @@ const SAMPLE_CERTIFICATES: CertificateTier[] = [
     type: 'CERTIFICATE OF TRAINING',
     badge: 'Foundation Phase',
     description: 'Awarded for completing the structured syllabus, video modules, and core coding quizzes of your track.',
-    recipient: 'Sonu Kumar',
     program: 'Full Stack Web Development',
     duration: '1 Month Training Phase',
     dates: 'Aug 1, 2026 to Aug 31, 2026',
@@ -56,7 +56,6 @@ const SAMPLE_CERTIFICATES: CertificateTier[] = [
     type: 'CERTIFICATE OF INTERNSHIP',
     badge: 'Official Credential',
     description: 'Issued once you complete your internship — final capstone project submitted, evaluated, and approved.',
-    recipient: 'Sonu Kumar',
     program: 'MERN Stack & Cloud Engineering',
     duration: '3 Months Internship',
     dates: 'Aug 1, 2026 to Oct 31, 2026',
@@ -71,7 +70,6 @@ const SAMPLE_CERTIFICATES: CertificateTier[] = [
     type: 'EXPERIENCE LETTER & CREDENTIAL',
     badge: 'Work Tenure Proof',
     description: 'A formal experience certificate confirming your engineering role, hands-on tenure, and technical competencies.',
-    recipient: 'Sonu Kumar',
     program: 'Software Development Engineering (Intern)',
     duration: '6 Months Hands-On Track',
     dates: 'Jul 1, 2026 to Dec 31, 2026',
@@ -86,7 +84,6 @@ const SAMPLE_CERTIFICATES: CertificateTier[] = [
     type: 'OFFICIAL RECOMMENDATION LETTER',
     badge: 'Excellence Honor',
     description: 'A personalized academic & job recommendation letter offered to strong performers by senior engineering mentors.',
-    recipient: 'Sonu Kumar',
     program: 'Next.js & Full-Stack Architecture',
     duration: 'Distinction Candidate',
     dates: 'Academic Batch 2026',
@@ -98,7 +95,10 @@ const SAMPLE_CERTIFICATES: CertificateTier[] = [
 ];
 
 export function CertificateSampleShowcase() {
+  const { user } = useAuth();
   const [selectedCert, setSelectedCert] = useState<CertificateTier | null>(null);
+
+  const activeStudentName = user?.name || 'Student Name';
 
   return (
     <div className="space-y-8">
@@ -125,7 +125,7 @@ export function CertificateSampleShowcase() {
                   <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                     {cert.type}
                   </div>
-                  <div className="text-xs font-black text-white">{cert.recipient}</div>
+                  <div className="text-xs font-black text-white">{activeStudentName}</div>
                   <div className="text-[9px] text-blue-300 line-clamp-1">{cert.program}</div>
                 </div>
 
@@ -268,7 +268,7 @@ export function CertificateSampleShowcase() {
                   {/* Recipient Name in Signature Typography */}
                   <div className="text-center my-2">
                     <div className="text-2xl sm:text-4xl font-black text-blue-950 font-serif tracking-tight border-b-2 border-amber-300 pb-2 inline-block px-8">
-                      {selectedCert.recipient}
+                      {activeStudentName}
                     </div>
                   </div>
 
