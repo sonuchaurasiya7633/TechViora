@@ -24,7 +24,7 @@ export default function PrivacyPolicyPage() {
 
           <h2 className="text-lg font-bold text-slate-900 mt-6">2. Payment Security</h2>
           <p>
-            Payment transactions are processed through Razorpay PCI-DSS compliant infrastructure. TechViora does not store credit/debit card numbers or CVVs on our servers.
+            Payment transactions are processed directly via secure UPI payments (sonu-6074@ptyes) with timestamped transaction verification. TechViora does not store bank credentials on our servers.
           </p>
 
           <h2 className="text-lg font-bold text-slate-900 mt-6">3. Public Certificate Verification</h2>

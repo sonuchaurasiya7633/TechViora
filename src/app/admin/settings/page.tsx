@@ -33,8 +33,8 @@ export default function AdminSettingsPage() {
     supportEmail: 'support@techviora.in',
     contactPhone: '+91 98765 43210',
     address: 'TechViora Learning Solutions, Bengaluru, Karnataka, India',
-    razorpayKeyId: '',
-    razorpayKeySecret: '',
+    upiId: 'sonu-6074@ptyes',
+    upiPayeeName: 'TechViora Learning',
     cloudinaryCloudName: '',
     cloudinaryApiKey: '',
     // Progress calculation weights
@@ -577,30 +577,30 @@ export default function AdminSettingsPage() {
 
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
             <h4 className="text-xs font-bold uppercase text-indigo-600 flex items-center gap-2">
-              <CreditCard className="w-4 h-4" /> Razorpay Payment Gateway
+              <CreditCard className="w-4 h-4" /> Direct UPI Payment Gateway
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Razorpay Key ID
+                  Active UPI ID
                 </label>
                 <input
                   type="text"
-                  value={settings.razorpayKeyId}
-                  onChange={(e) => setSettings({ ...settings, razorpayKeyId: e.target.value })}
-                  placeholder="rzp_test_..."
-                  className="w-full px-3.5 py-2 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
+                  value={settings.upiId}
+                  onChange={(e) => setSettings({ ...settings, upiId: e.target.value })}
+                  placeholder="sonu-6074@ptyes"
+                  className="w-full px-3.5 py-2 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 font-bold text-blue-600"
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Razorpay Key Secret
+                  Payee Business / Name
                 </label>
                 <input
-                  type="password"
-                  value={settings.razorpayKeySecret}
-                  onChange={(e) => setSettings({ ...settings, razorpayKeySecret: e.target.value })}
-                  placeholder="••••••••••••••••"
+                  type="text"
+                  value={settings.upiPayeeName}
+                  onChange={(e) => setSettings({ ...settings, upiPayeeName: e.target.value })}
+                  placeholder="TechViora Learning"
                   className="w-full px-3.5 py-2 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
                 />
               </div>

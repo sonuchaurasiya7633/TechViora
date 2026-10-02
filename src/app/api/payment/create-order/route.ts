@@ -6,6 +6,7 @@ import { ProgramPlan } from '@/models/ProgramPlan';
 import { Coupon } from '@/models/Coupon';
 import { Order } from '@/models/Order';
 import { getRazorpayClient } from '@/lib/razorpay';
+import { generateUpiQrDataUrl, DEFAULT_UPI_ID, DEFAULT_PAYEE_NAME } from '@/lib/upi';
 
 export async function POST(req: NextRequest) {
   try {
@@ -36,7 +37,6 @@ export async function POST(req: NextRequest) {
     // SERVER-SIDE price determination (Never trusting client-supplied amount)
     let basePrice = plan.salePrice;
 
-    // Check if program has custom override pricing
     if (program.customPricingEnabled && program.customPrices) {
       if (plan.slug === '1-month' && program.customPrices.oneMonth) {
         basePrice = program.customPrices.oneMonth;
@@ -70,56 +70,75 @@ export async function POST(req: NextRequest) {
     const finalAmount = Math.max(0, basePrice - discountAmount);
     const receipt = `rcpt_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-    let razorpayOrderId = `order_sim_${Date.now()}`;
-    let isSimulation = true;
+    let orderId = `order_sim_${Date.now()}`;
+    let isRazorpayCreated = false;
 
+    // Create Razorpay Order via live API
     try {
       const razorpay = getRazorpayClient();
-      if (process.env.RAZORPAY_KEY_SECRET && process.env.RAZORPAY_KEY_SECRET !== 'mocksecret123') {
-        const rzpOrder = await razorpay.orders.create({
-          amount: finalAmount * 100, // in paise
-          currency: 'INR',
-          receipt,
-          notes: {
-            programId: program._id.toString(),
-            planId: plan._id.toString(),
-            studentId: user.userId,
-            programSlug: program.slug,
-          },
-        });
-        razorpayOrderId = rzpOrder.id;
-        isSimulation = false;
-      }
+      const rzpOrder = await razorpay.orders.create({
+        amount: finalAmount * 100, // in paise
+        currency: 'INR',
+        receipt,
+        notes: {
+          programId: program._id.toString(),
+          planId: plan._id.toString(),
+          studentId: user.userId,
+          programSlug: program.slug,
+        },
+      });
+      orderId = rzpOrder.id;
+      isRazorpayCreated = true;
     } catch (rzpErr) {
-      console.warn('Razorpay order creation fallback to simulated order:', rzpErr);
+      console.warn('Razorpay live order fallback to internal order:', rzpErr);
+      orderId = `ORD_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
     }
 
-    // Save order in database
-    await Order.create({
-      orderId: razorpayOrderId,
+    const upiId = DEFAULT_UPI_ID;
+    const payeeName = DEFAULT_PAYEE_NAME;
+
+    // Save order record
+    const newOrder = await Order.create({
+      orderId,
       student: user.userId,
       program: program._id,
       plan: plan._id,
       amount: finalAmount,
       currency: 'INR',
+      upiId,
       status: 'created',
       couponCode: appliedCoupon,
       discountAmount,
       studentDetails: studentDetails || {},
       receipt,
+      paymentTimestamp: new Date(),
+    });
+
+    // Dynamic QR Data URL
+    const qrDataUrl = await generateUpiQrDataUrl({
+      upiId,
+      payeeName,
+      amount: finalAmount,
+      transactionNote: `TechViora: ${program.title.substring(0, 20)}`,
+      transactionRef: orderId,
     });
 
     return NextResponse.json({
       success: true,
-      orderId: razorpayOrderId,
+      orderId,
       amount: finalAmount,
       currency: 'INR',
-      keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_test_TechViora2026Key',
+      keyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || 'rzp_live_Tj6i2RzYNR1GHp',
+      upiId,
+      payeeName,
+      qrDataUrl,
+      uploadedQrUrl: '/payment-qr.jpg',
       programTitle: program.title,
       planName: plan.name,
-      isSimulation,
       discountAmount,
       basePrice,
+      isRazorpayCreated,
+      createdAt: newOrder.createdAt,
     });
   } catch (error: any) {
     console.error('Create order error:', error);

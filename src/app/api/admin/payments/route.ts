@@ -16,13 +16,15 @@ export async function GET(req: NextRequest) {
     if (status) filter.status = status;
     if (search) {
       filter.$or = [
+        { utrNumber: { $regex: search, $options: 'i' } },
         { paymentId: { $regex: search, $options: 'i' } },
         { orderId: { $regex: search, $options: 'i' } },
+        { upiId: { $regex: search, $options: 'i' } },
       ];
     }
 
     const payments = await Payment.find(filter)
-      .populate('student', 'name email')
+      .populate('student', 'name email phone')
       .populate('program', 'title slug')
       .populate('plan', 'name durationLabel')
       .sort({ createdAt: -1 });

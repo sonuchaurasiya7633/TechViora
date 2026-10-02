@@ -1,13 +1,16 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IOrder extends Document {
-  orderId: string; // Razorpay order id or internal order id
+  orderId: string; // internal order id
   student: mongoose.Types.ObjectId;
   program: mongoose.Types.ObjectId;
   plan: mongoose.Types.ObjectId;
   amount: number; // in rupees
   currency: string;
-  status: 'created' | 'attempted' | 'paid' | 'failed';
+  upiId?: string;
+  utrNumber?: string;
+  paymentTimestamp?: Date;
+  status: 'created' | 'attempted' | 'submitted' | 'paid' | 'failed';
   couponCode?: string;
   discountAmount?: number;
   studentDetails: Record<string, any>;
@@ -24,9 +27,12 @@ const OrderSchema = new Schema<IOrder>(
     plan: { type: Schema.Types.ObjectId, ref: 'ProgramPlan', required: true },
     amount: { type: Number, required: true },
     currency: { type: String, default: 'INR' },
+    upiId: { type: String, default: 'sonu-6074@ptyes' },
+    utrNumber: { type: String, default: '' },
+    paymentTimestamp: { type: Date, default: Date.now },
     status: {
       type: String,
-      enum: ['created', 'attempted', 'paid', 'failed'],
+      enum: ['created', 'attempted', 'submitted', 'paid', 'failed'],
       default: 'created',
     },
     couponCode: { type: String, default: '' },

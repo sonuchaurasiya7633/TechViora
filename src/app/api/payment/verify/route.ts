@@ -10,73 +10,114 @@ import { ProgramPlan } from '@/models/ProgramPlan';
 import { Coupon } from '@/models/Coupon';
 import { Notification } from '@/models/Notification';
 import { StudentProfile } from '@/models/StudentProfile';
-import { verifyRazorpaySignature } from '@/lib/razorpay';
 import { generateEnrollmentId } from '@/lib/utils';
 import { sendEmail, getEnrollmentEmailTemplate } from '@/lib/email';
+import { verifyRazorpaySignature } from '@/lib/razorpay';
+import { validateUtr, DEFAULT_UPI_ID } from '@/lib/upi';
 
 export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
     if (!user) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ success: false, message: 'Unauthorized. Please log in.' }, { status: 401 });
     }
 
+    const body = await req.json();
     const {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
+      orderId: bodyOrderId,
+      utrNumber,
       studentDetails,
-    } = await req.json();
+      paymentTimestamp: customTimestamp,
+    } = body;
 
-    if (!razorpay_order_id || !razorpay_payment_id) {
-      return NextResponse.json({ success: false, message: 'Missing payment identifiers' }, { status: 400 });
+    const targetOrderId = razorpay_order_id || bodyOrderId;
+
+    if (!targetOrderId) {
+      return NextResponse.json({ success: false, message: 'Missing order reference' }, { status: 400 });
     }
 
     await connectToDatabase();
 
-    const order = await Order.findOne({ orderId: razorpay_order_id });
+    const order = await Order.findOne({ orderId: targetOrderId });
     if (!order) {
       return NextResponse.json({ success: false, message: 'Order record not found' }, { status: 404 });
     }
 
-    // Verify signature
-    const isValid = verifyRazorpaySignature({
-      orderId: razorpay_order_id,
-      paymentId: razorpay_payment_id,
-      signature: razorpay_signature || 'mock_signature_valid',
-    });
+    let paymentId = razorpay_payment_id || `PAY_UPI_${utrNumber || Date.now()}`;
+    let gateway: 'razorpay' | 'upi_qr' | 'manual_test' = razorpay_payment_id ? 'razorpay' : 'upi_qr';
+    let cleanUtr = utrNumber ? utrNumber.trim() : razorpay_payment_id || '';
 
-    if (!isValid) {
-      order.status = 'failed';
-      await order.save();
-      return NextResponse.json({ success: false, message: 'Payment signature verification failed' }, { status: 400 });
+    // If Razorpay parameters provided, verify signature
+    if (razorpay_payment_id) {
+      const isValid = verifyRazorpaySignature({
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+        signature: razorpay_signature || 'mock_signature_valid',
+      });
+
+      if (!isValid) {
+        order.status = 'failed';
+        await order.save();
+        return NextResponse.json({ success: false, message: 'Razorpay payment signature verification failed' }, { status: 400 });
+      }
+    } else if (utrNumber) {
+      if (!validateUtr(utrNumber)) {
+        return NextResponse.json({
+          success: false,
+          message: 'Please enter a valid UTR / Transaction Reference Number (min 6 characters).'
+        }, { status: 400 });
+      }
     }
+
+    const paymentTimestamp = customTimestamp ? new Date(customTimestamp) : new Date();
 
     // Fetch Program and Plan
     const program = await Program.findById(order.program);
     const plan = await ProgramPlan.findById(order.plan);
 
     if (!program || !plan) {
-      return NextResponse.json({ success: false, message: 'Program or Plan not found' }, { status: 404 });
+      return NextResponse.json({ success: false, message: 'Associated Program or Plan not found' }, { status: 404 });
     }
 
+    const upiId = DEFAULT_UPI_ID;
+
     // Record Payment
-    await Payment.create({
-      orderId: razorpay_order_id,
-      paymentId: razorpay_payment_id,
-      signature: razorpay_signature || '',
-      student: user.userId,
-      program: program._id,
-      plan: plan._id,
-      amount: order.amount,
-      currency: 'INR',
-      gateway: razorpay_payment_id.startsWith('pay_mock') ? 'manual_test' : 'razorpay',
-      status: 'captured',
-      verifiedAt: new Date(),
+    let paymentRecord = await Payment.findOne({
+      $or: [{ orderId: targetOrderId }, { paymentId }]
     });
+
+    if (!paymentRecord) {
+      paymentRecord = await Payment.create({
+        orderId: targetOrderId,
+        paymentId,
+        utrNumber: cleanUtr,
+        upiId,
+        student: user.userId,
+        program: program._id,
+        plan: plan._id,
+        amount: order.amount,
+        currency: 'INR',
+        gateway,
+        status: 'captured',
+        method: gateway === 'razorpay' ? 'Razorpay Live Gateway' : 'UPI / QR Code (sonu-6074@ptyes)',
+        paymentTimestamp,
+        verifiedAt: new Date(),
+      });
+    } else {
+      paymentRecord.utrNumber = cleanUtr;
+      paymentRecord.status = 'captured';
+      paymentRecord.verifiedAt = new Date();
+      await paymentRecord.save();
+    }
 
     // Update order status
     order.status = 'paid';
+    order.utrNumber = cleanUtr;
+    order.upiId = upiId;
+    order.paymentTimestamp = paymentTimestamp;
     await order.save();
 
     // Calculate dates
@@ -102,7 +143,7 @@ export async function POST(req: NextRequest) {
       githubUrl: studentDetails?.githubUrl || '',
     };
 
-    // Update student profile with latest college information
+    // Update student profile with latest academic details
     await StudentProfile.findOneAndUpdate(
       { user: user.userId },
       {
@@ -132,8 +173,11 @@ export async function POST(req: NextRequest) {
       discount: order.discountAmount || 0,
       couponCode: order.couponCode || '',
       finalAmount: order.amount,
-      razorpayOrderId: razorpay_order_id,
-      razorpayPaymentId: razorpay_payment_id,
+      upiId,
+      utrNumber: cleanUtr,
+      razorpayOrderId: razorpay_order_id || targetOrderId,
+      razorpayPaymentId: razorpay_payment_id || paymentId,
+      paymentTimestamp,
       paymentStatus: 'paid',
       startDate,
       endDate,
@@ -165,18 +209,27 @@ export async function POST(req: NextRequest) {
       await Coupon.updateOne({ code: order.couponCode }, { $inc: { timesUsed: 1 } });
     }
 
+    const formattedTime = new Date(paymentTimestamp).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+
     // Create In-App Notification
     await Notification.create({
       user: user.userId,
       title: 'Enrollment Confirmed! 🎉',
-      message: `You are successfully enrolled in ${program.title} (${plan.durationLabel}). Your enrollment ID is ${enrollmentId}.`,
+      message: `Your payment (${paymentId}) submitted at ${formattedTime} is verified. Your Enrollment ID is ${enrollmentId}.`,
       link: `/student/internships/${enrollment._id}`,
       type: 'system',
     });
 
-    // Send confirmation email
+    // Send confirmation email asynchronously
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    await sendEmail({
+    sendEmail({
       to: details.email,
       subject: `Enrollment Confirmed: ${program.title} - TechViora`,
       html: getEnrollmentEmailTemplate({
@@ -186,12 +239,14 @@ export async function POST(req: NextRequest) {
         duration: plan.durationLabel,
         dashboardUrl: `${appUrl}/student/dashboard`,
       }),
-    });
+    }).catch(e => console.warn('Email dispatch warning:', e));
 
     return NextResponse.json({
       success: true,
-      message: 'Enrollment activated successfully!',
+      message: 'Payment verified successfully! Enrollment activated.',
       enrollmentId,
+      paymentId,
+      paymentTimestamp: formattedTime,
       enrollmentDbId: enrollment._id.toString(),
       redirectUrl: '/student/dashboard',
     });

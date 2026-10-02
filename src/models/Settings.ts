@@ -18,6 +18,9 @@ export interface ISettings extends Document {
   };
   razorpayKeyId?: string;
   razorpayKeySecret?: string;
+  upiId: string;
+  upiPayeeName: string;
+  upiQrImageUrl?: string;
   cloudinaryCloudName?: string;
   cloudinaryApiKey?: string;
   cloudinaryApiSecret?: string;
@@ -57,8 +60,11 @@ const SettingsSchema = new Schema<ISettings>(
       youtube: { type: String, default: 'https://youtube.com' },
       instagram: { type: String, default: 'https://instagram.com' },
     },
-    razorpayKeyId: { type: String, default: '' },
-    razorpayKeySecret: { type: String, default: '' },
+    razorpayKeyId: { type: String, default: 'rzp_live_Tj6i2RzYNR1GHp' },
+    razorpayKeySecret: { type: String, default: '1MqyMb45KHrbcd8l437Wb4UT' },
+    upiId: { type: String, default: 'sonu-6074@ptyes' },
+    upiPayeeName: { type: String, default: 'TechViora Learning' },
+    upiQrImageUrl: { type: String, default: '/payment-qr.jpg' },
     cloudinaryCloudName: { type: String, default: '' },
     cloudinaryApiKey: { type: String, default: '' },
     cloudinaryApiSecret: { type: String, default: '' },

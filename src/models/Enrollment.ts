@@ -27,9 +27,12 @@ export interface IEnrollment extends Document {
   discount: number;
   couponCode?: string;
   finalAmount: number;
+  upiId?: string;
+  utrNumber?: string;
+  paymentTimestamp?: Date;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
-  paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded';
+  paymentStatus: 'pending' | 'pending_verification' | 'paid' | 'failed' | 'refunded' | 'rejected';
   startDate: Date;
   endDate: Date;
   progressPercent: number;
@@ -66,11 +69,14 @@ const EnrollmentSchema = new Schema<IEnrollment>(
     discount: { type: Number, default: 0 },
     couponCode: { type: String, default: '' },
     finalAmount: { type: Number, required: true },
+    upiId: { type: String, default: 'sonu-6074@ptyes' },
+    utrNumber: { type: String, default: '' },
+    paymentTimestamp: { type: Date, default: Date.now },
     razorpayOrderId: { type: String, default: '' },
     razorpayPaymentId: { type: String, default: '' },
     paymentStatus: {
       type: String,
-      enum: ['pending', 'paid', 'failed', 'refunded'],
+      enum: ['pending', 'pending_verification', 'paid', 'failed', 'refunded', 'rejected'],
       default: 'pending',
     },
     startDate: { type: Date, default: Date.now },
